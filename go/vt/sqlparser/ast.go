@@ -956,17 +956,25 @@ func (node *ParenSelect) Format(buf *TrackedBuffer) {
 
 // Format formats the node.
 func (node *Auth) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "AUTH %v %s %v", node.Provider, node.Type, node.KeyFilePath)
+	var infraql_opt string
+	if node.SessionAuth {
+		infraql_opt = "infraql "
+	}
+	buf.astPrintf(node, "%sAUTH %v %s %v", infraql_opt, node.Provider, node.Type, node.KeyFilePath)
 }
 
 // Format formats the node.
 func (node *AuthRevoke) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "(%v)", node)
+	var infraql_opt string
+	if node.SessionAuth {
+		infraql_opt = "infraql "
+	}
+	buf.astPrintf(node, "%sauth revoke %v", infraql_opt, node.Provider)
 }
 
 // Format formats the node.
 func (node *Sleep) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "(%v)", node)
+	buf.astPrintf(node, "sleep %v", node.Duration)
 }
 
 // Format formats the node.
@@ -1547,6 +1555,13 @@ func (node TableNames) Format(buf *TrackedBuffer) {
 func (node TableName) Format(buf *TrackedBuffer) {
 	if node.IsEmpty() {
 		return
+	}
+	buf.astPrintf(node, `"`)
+	if !node.QualifierThird.IsEmpty() {
+		buf.astPrintf(node, "%v.", node.QualifierThird)
+	}
+	if !node.QualifierSecond.IsEmpty() {
+		buf.astPrintf(node, "%v.", node.QualifierSecond)
 	}
 	if !node.Qualifier.IsEmpty() {
 		buf.astPrintf(node, "%v.", node.Qualifier)
