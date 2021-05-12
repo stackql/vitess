@@ -1567,6 +1567,7 @@ func (node TableName) Format(buf *TrackedBuffer) {
 		buf.astPrintf(node, "%v.", node.Qualifier)
 	}
 	buf.astPrintf(node, "%v", node.Name)
+	buf.astPrintf(node, `"`)
 }
 
 // Format formats the node.
