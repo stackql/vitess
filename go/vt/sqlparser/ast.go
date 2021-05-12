@@ -946,7 +946,7 @@ func (node *Select) Format(buf *TrackedBuffer) {
 }
 
 func (node *Exec) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "(%v)", node)
+	buf.astPrintf(node, "exec %v %v", node.Comments, node.MethodName)
 }
 
 // Format formats the node.
@@ -956,7 +956,7 @@ func (node *ParenSelect) Format(buf *TrackedBuffer) {
 
 // Format formats the node.
 func (node *Auth) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "(%v)", node)
+	buf.astPrintf(node, "AUTH %v %s %v", node.Provider, node.Type, node.KeyFilePath)
 }
 
 // Format formats the node.
