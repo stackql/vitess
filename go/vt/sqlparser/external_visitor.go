@@ -26,6 +26,7 @@ func (v *DRMAstVisitor) GetGCQuery() string {
 
 func (v *DRMAstVisitor) Visit(node SQLNode) error {
 	buf := NewTrackedBuffer(nil)
+
 	switch node := node.(type) {
 	case *Select:
 		var options string
@@ -45,17 +46,51 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		addIf(node.StraightJoinHint, StraightJoinHint)
 		addIf(node.SQLCalcFoundRows, SQLCalcFoundRowsStr)
 
-		buf.astPrintf(node, "select %v%s%v from %v%v%v%v%v%v%s",
-			node.Comments, options, node.SelectExprs,
-			node.From, node.Where,
-			node.GroupBy, node.Having, node.OrderBy,
-			node.Limit, node.Lock)
-		v.rewrittenQuery = buf.String()
+		var commentStr, selectExprStr, fromStr, whereStr, groupByStr, havingStr, orderByStr, limitStr string
+		if node.Comments != nil {
+			node.Comments.Accept(v)
+			commentStr = v.GetRewrittenQuery()
+		}
+		if node.SelectExprs != nil {
+			node.SelectExprs.Accept(v)
+			selectExprStr = v.GetRewrittenQuery()
+		}
+		if node.From != nil {
+			node.From.Accept(v)
+			fromStr = v.GetRewrittenQuery()
+		}
+		if node.Where != nil {
+			node.Where.Accept(v)
+			whereStr = v.GetRewrittenQuery()
+		}
+		if node.GroupBy != nil {
+			node.GroupBy.Accept(v)
+			groupByStr = v.GetRewrittenQuery()
+		}
+		if node.Having != nil {
+			node.Having.Accept(v)
+			havingStr = v.GetRewrittenQuery()
+		}
+		if node.OrderBy != nil {
+			node.OrderBy.Accept(v)
+			orderByStr = v.GetRewrittenQuery()
+		}
+		if node.Limit != nil {
+			node.Limit.Accept(v)
+			orderByStr = v.GetRewrittenQuery()
+		}
+		rq := fmt.Sprintf("select %v%s%v from %v%v%v%v%v%v%s",
+			commentStr, options, selectExprStr,
+			fromStr, whereStr,
+			groupByStr, havingStr, orderByStr,
+			limitStr, node.Lock)
+		v.rewrittenQuery = rq
 		v.gcQuery = ""
 		return nil
 
 	case *ParenSelect:
 		buf.astPrintf(node, "(%v)", node.Select)
+		v.rewrittenQuery = buf.String()
 
 	case *Auth:
 		var infraql_opt string
@@ -63,6 +98,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			infraql_opt = "infraql "
 		}
 		buf.astPrintf(node, "%sAUTH %v %s %v", infraql_opt, node.Provider, node.Type, node.KeyFilePath)
+		v.rewrittenQuery = buf.String()
 
 	case *AuthRevoke:
 		var infraql_opt string
@@ -70,9 +106,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			infraql_opt = "infraql "
 		}
 		buf.astPrintf(node, "%sauth revoke %v", infraql_opt, node.Provider)
+		v.rewrittenQuery = buf.String()
 
 	case *Sleep:
 		buf.astPrintf(node, "sleep %v", node.Duration)
+		v.rewrittenQuery = buf.String()
 
 	case *Union:
 		buf.astPrintf(node, "%v", node.FirstStatement)
@@ -80,24 +118,29 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%v", us)
 		}
 		buf.astPrintf(node, "%v%v%s", node.OrderBy, node.Limit, node.Lock)
+		v.rewrittenQuery = buf.String()
 
 	case *UnionSelect:
 		buf.astPrintf(node, " %s %v", node.Type, node.Statement)
+		v.rewrittenQuery = buf.String()
 
 	case *Stream:
 		buf.astPrintf(node, "stream %v%v from %v",
 			node.Comments, node.SelectExpr, node.Table)
+		v.rewrittenQuery = buf.String()
 
 	case *Insert:
 		buf.astPrintf(node, "%s %v%sinto %v%v%v %v%v",
 			node.Action,
 			node.Comments, node.Ignore,
 			node.Table, node.Partitions, node.Columns, node.Rows, node.OnDup)
+		v.rewrittenQuery = buf.String()
 
 	case *Update:
 		buf.astPrintf(node, "update %v%s%v set %v%v%v%v",
 			node.Comments, node.Ignore, node.TableExprs,
 			node.Exprs, node.Where, node.OrderBy, node.Limit)
+		v.rewrittenQuery = buf.String()
 
 	case *Delete:
 		buf.astPrintf(node, "delete %v", node.Comments)
@@ -105,9 +148,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%v ", node.Targets)
 		}
 		buf.astPrintf(node, "from %v%v%v%v%v", node.TableExprs, node.Partitions, node.Where, node.OrderBy, node.Limit)
+		v.rewrittenQuery = buf.String()
 
 	case *Set:
 		buf.astPrintf(node, "set %v%v", node.Comments, node.Exprs)
+		v.rewrittenQuery = buf.String()
 
 	case *SetTransaction:
 		if node.Scope == "" {
@@ -122,6 +167,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			}
 			buf.astPrintf(node, "%v", char)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *DBDDL:
 		switch node.Action {
@@ -134,6 +180,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			}
 			buf.WriteString(fmt.Sprintf("%s database%s %v", node.Action, exists, node.DBName))
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *DDL:
 		switch node.Action {
@@ -194,9 +241,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		default:
 			buf.astPrintf(node, "%s table %v", node.Action, node.Table)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *OptLike:
 		buf.astPrintf(node, "like %v", node.LikeTable)
+		v.rewrittenQuery = buf.String()
 
 	case *PartitionSpec:
 		switch node.Action {
@@ -211,6 +260,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		default:
 			panic("unimplemented")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *PartitionDefinition:
 		if !node.Maxvalue {
@@ -218,6 +268,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		} else {
 			buf.astPrintf(node, "partition %v values less than (maxvalue)", node.Name)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *TableSpec:
 		ts := node
@@ -237,10 +288,12 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		}
 
 		buf.astPrintf(ts, "\n)%s", strings.Replace(ts.Options, ", ", ",\n  ", -1))
+		v.rewrittenQuery = buf.String()
 
 	case *ColumnDefinition:
 		col := node
 		buf.astPrintf(col, "%v %v", col.Name, &col.Type)
+		v.rewrittenQuery = buf.String()
 
 	// Format returns a canonical string representation of the type and all relevant options
 	case *ColumnType:
@@ -305,6 +358,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		if len(opts) != 0 {
 			buf.astPrintf(ct, " %s", strings.Join(opts, " "))
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *IndexDefinition:
 		idx := node
@@ -329,6 +383,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 				buf.astPrintf(idx, " %v", opt.Value)
 			}
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *IndexInfo:
 		ii := node
@@ -340,10 +395,12 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 				buf.astPrintf(ii, " %v", ii.Name)
 			}
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *AutoIncSpec:
 		buf.astPrintf(node, "%v ", node.Column)
 		buf.astPrintf(node, "using %v", node.Sequence)
+		v.rewrittenQuery = buf.String()
 
 	case *VindexSpec:
 		buf.astPrintf(node, "using %v", node.Type)
@@ -358,9 +415,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 				buf.astPrintf(node, "%v", p)
 			}
 		}
+		v.rewrittenQuery = buf.String()
 
 	case VindexParam:
 		buf.astPrintf(node, "%s=%s", node.Key.String(), node.Val)
+		v.rewrittenQuery = buf.String()
 
 	case *ConstraintDefinition:
 		c := node
@@ -368,6 +427,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(c, "constraint %s ", c.Name)
 		}
 		c.Details.Format(buf)
+		v.rewrittenQuery = buf.String()
 
 	case ReferenceAction:
 		a := node
@@ -383,6 +443,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		case SetDefault:
 			buf.WriteString("set default")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *ForeignKeyDefinition:
 		f := node
@@ -393,6 +454,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		if f.OnUpdate != DefaultAction {
 			buf.astPrintf(f, " on update %v", f.OnUpdate)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *Show:
 		nodeType := strings.ToLower(node.Type)
@@ -432,6 +494,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		if node.HasTable() {
 			buf.astPrintf(node, " %v", node.Table)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *ShowFilter:
 		if node == nil {
@@ -442,6 +505,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		} else {
 			buf.astPrintf(node, " where %v", node.Filter)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *Use:
 		if node.DBName.v != "" {
@@ -449,24 +513,31 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		} else {
 			buf.astPrintf(node, "use")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *Commit:
 		buf.WriteString("commit")
+		v.rewrittenQuery = buf.String()
 
 	case *Begin:
 		buf.WriteString("begin")
+		v.rewrittenQuery = buf.String()
 
 	case *Rollback:
 		buf.WriteString("rollback")
+		v.rewrittenQuery = buf.String()
 
 	case *SRollback:
 		buf.astPrintf(node, "rollback to %v", node.Name)
+		v.rewrittenQuery = buf.String()
 
 	case *Savepoint:
 		buf.astPrintf(node, "savepoint %v", node.Name)
+		v.rewrittenQuery = buf.String()
 
 	case *Release:
 		buf.astPrintf(node, "release savepoint %v", node.Name)
+		v.rewrittenQuery = buf.String()
 
 	case *Explain:
 		format := ""
@@ -478,20 +549,25 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			format = "format = " + node.Type + " "
 		}
 		buf.astPrintf(node, "explain %s%v", format, node.Statement)
+		v.rewrittenQuery = buf.String()
 
 	case *OtherRead:
 		buf.WriteString("otherread")
+		v.rewrittenQuery = buf.String()
 
 	case *DescribeTable:
 		buf.WriteString("describetable")
+		v.rewrittenQuery = buf.String()
 
 	case *OtherAdmin:
 		buf.WriteString("otheradmin")
+		v.rewrittenQuery = buf.String()
 
 	case Comments:
 		for _, c := range node {
 			buf.astPrintf(node, "%s ", c)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case SelectExprs:
 		var prefix string
@@ -499,21 +575,25 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *StarExpr:
 		if !node.TableName.IsEmpty() {
 			buf.astPrintf(node, "%v.", node.TableName)
 		}
 		buf.astPrintf(node, "*")
+		v.rewrittenQuery = buf.String()
 
 	case *AliasedExpr:
 		buf.astPrintf(node, "%v", node.Expr)
 		if !node.As.IsEmpty() {
 			buf.astPrintf(node, " as %v", node.As)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case Nextval:
 		buf.astPrintf(node, "next %v values", node.Expr)
+		v.rewrittenQuery = buf.String()
 
 	case Columns:
 		if node == nil {
@@ -525,6 +605,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			prefix = ", "
 		}
 		buf.WriteString(")")
+		v.rewrittenQuery = buf.String()
 
 	case Partitions:
 		if node == nil {
@@ -536,6 +617,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			prefix = ", "
 		}
 		buf.WriteString(")")
+		v.rewrittenQuery = buf.String()
 
 	case TableExprs:
 		var prefix string
@@ -543,6 +625,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *AliasedTableExpr:
 		buf.astPrintf(node, "%v%v", node.Expr, node.Partitions)
@@ -553,6 +636,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			// Hint node provides the space padding.
 			buf.astPrintf(node, "%v", node.Hints)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case TableNames:
 		var prefix string
@@ -560,6 +644,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case TableName:
 		if node.IsEmpty() {
@@ -577,9 +662,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		}
 		buf.astPrintf(node, "%v", node.Name)
 		buf.astPrintf(node, `"`)
+		v.rewrittenQuery = buf.String()
 
 	case *ParenTableExpr:
 		buf.astPrintf(node, "(%v)", node.Exprs)
+		v.rewrittenQuery = buf.String()
 
 	case JoinCondition:
 		if node.On != nil {
@@ -588,9 +675,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		if node.Using != nil {
 			buf.astPrintf(node, " using %v", node.Using)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *JoinTableExpr:
 		buf.astPrintf(node, "%v %s %v%v", node.LeftExpr, node.Join, node.RightExpr, node.Condition)
+		v.rewrittenQuery = buf.String()
 
 	case *IndexHints:
 		buf.astPrintf(node, " %sindex ", node.Type)
@@ -604,12 +693,14 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			}
 			buf.astPrintf(node, ")")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *Where:
 		if node == nil || node.Expr == nil {
 			return nil
 		}
 		buf.astPrintf(node, " %s %v", node.Type, node.Expr)
+		v.rewrittenQuery = buf.String()
 
 	case Exprs:
 		var prefix string
@@ -617,33 +708,42 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *AndExpr:
 		buf.astPrintf(node, "%v and %v", node.Left, node.Right)
+		v.rewrittenQuery = buf.String()
 
 	case *OrExpr:
 		buf.astPrintf(node, "%v or %v", node.Left, node.Right)
+		v.rewrittenQuery = buf.String()
 
 	case *XorExpr:
 		buf.astPrintf(node, "%v xor %v", node.Left, node.Right)
+		v.rewrittenQuery = buf.String()
 
 	case *NotExpr:
 		buf.astPrintf(node, "not %v", node.Expr)
+		v.rewrittenQuery = buf.String()
 
 	case *ComparisonExpr:
 		buf.astPrintf(node, "%v %s %v", node.Left, node.Operator, node.Right)
 		if node.Escape != nil {
 			buf.astPrintf(node, " escape %v", node.Escape)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *RangeCond:
 		buf.astPrintf(node, "%v %s %v and %v", node.Left, node.Operator, node.From, node.To)
+		v.rewrittenQuery = buf.String()
 
 	case *IsExpr:
 		buf.astPrintf(node, "%v %s", node.Expr, node.Operator)
+		v.rewrittenQuery = buf.String()
 
 	case *ExistsExpr:
 		buf.astPrintf(node, "exists %v", node.Subquery)
+		v.rewrittenQuery = buf.String()
 
 	case *SQLVal:
 		switch node.Type {
@@ -660,9 +760,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		default:
 			panic("unexpected")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *NullVal:
 		buf.astPrintf(node, "null")
+		v.rewrittenQuery = buf.String()
 
 	case BoolVal:
 		if node {
@@ -670,24 +772,30 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		} else {
 			buf.astPrintf(node, "false")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *ColName:
 		if !node.Qualifier.IsEmpty() {
 			buf.astPrintf(node, "%v.", node.Qualifier)
 		}
 		buf.astPrintf(node, "%v", node.Name)
+		v.rewrittenQuery = buf.String()
 
 	case ValTuple:
 		buf.astPrintf(node, "(%v)", Exprs(node))
+		v.rewrittenQuery = buf.String()
 
 	case *Subquery:
 		buf.astPrintf(node, "(%v)", node.Select)
+		v.rewrittenQuery = buf.String()
 
 	case ListArg:
 		buf.WriteArg(string(node))
+		v.rewrittenQuery = buf.String()
 
 	case *BinaryExpr:
 		buf.astPrintf(node, "%v %s %v", node.Left, node.Operator, node.Right)
+		v.rewrittenQuery = buf.String()
 
 	case *UnaryExpr:
 		if _, unary := node.Expr.(*UnaryExpr); unary {
@@ -696,18 +804,23 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			return nil
 		}
 		buf.astPrintf(node, "%s%v", node.Operator, node.Expr)
+		v.rewrittenQuery = buf.String()
 
 	case *IntervalExpr:
 		buf.astPrintf(node, "interval %v %s", node.Expr, node.Unit)
+		v.rewrittenQuery = buf.String()
 
 	case *TimestampFuncExpr:
 		buf.astPrintf(node, "%s(%s, %v, %v)", node.Name, node.Unit, node.Expr1, node.Expr2)
+		v.rewrittenQuery = buf.String()
 
 	case *CurTimeFuncExpr:
 		buf.astPrintf(node, "%s(%v)", node.Name.String(), node.Fsp)
+		v.rewrittenQuery = buf.String()
 
 	case *CollateExpr:
 		buf.astPrintf(node, "%v collate %s", node.Expr, node.Charset)
+		v.rewrittenQuery = buf.String()
 
 	case *FuncExpr:
 		var distinct string
@@ -727,12 +840,15 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.WriteString(funcName)
 		}
 		buf.astPrintf(node, "(%s%v)", distinct, node.Exprs)
+		v.rewrittenQuery = buf.String()
 
 	case *GroupConcatExpr:
 		buf.astPrintf(node, "group_concat(%s%v%v%s%v)", node.Distinct, node.Exprs, node.OrderBy, node.Separator, node.Limit)
+		v.rewrittenQuery = buf.String()
 
 	case *ValuesFuncExpr:
 		buf.astPrintf(node, "values(%v)", node.Name)
+		v.rewrittenQuery = buf.String()
 
 	case *SubstrExpr:
 		var val interface{}
@@ -747,12 +863,15 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		} else {
 			buf.astPrintf(node, "substr(%v, %v, %v)", val, node.From, node.To)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *ConvertExpr:
 		buf.astPrintf(node, "convert(%v, %v)", node.Expr, node.Type)
+		v.rewrittenQuery = buf.String()
 
 	case *ConvertUsingExpr:
 		buf.astPrintf(node, "convert(%v using %s)", node.Expr, node.Type)
+		v.rewrittenQuery = buf.String()
 
 	case *ConvertType:
 		buf.astPrintf(node, "%s", node.Type)
@@ -766,9 +885,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		if node.Charset != "" {
 			buf.astPrintf(node, "%s %s", node.Operator, node.Charset)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *MatchExpr:
 		buf.astPrintf(node, "match(%v) against (%v%s)", node.Columns, node.Expr, node.Option)
+		v.rewrittenQuery = buf.String()
 
 	case *CaseExpr:
 		buf.astPrintf(node, "case ")
@@ -782,6 +903,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "else %v ", node.Else)
 		}
 		buf.astPrintf(node, "end")
+		v.rewrittenQuery = buf.String()
 
 	case *Default:
 		buf.astPrintf(node, "default")
@@ -790,9 +912,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			formatID(buf, node.ColName, strings.ToLower(node.ColName), NoAt)
 			buf.WriteString(")")
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *When:
 		buf.astPrintf(node, "when %v then %v", node.Cond, node.Val)
+		v.rewrittenQuery = buf.String()
 
 	case GroupBy:
 		prefix := " group by "
@@ -800,6 +924,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case OrderBy:
 		prefix := " order by "
@@ -807,6 +932,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *Order:
 		if node, ok := node.Expr.(*NullVal); ok {
@@ -821,6 +947,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		}
 
 		buf.astPrintf(node, "%v %s", node.Expr, node.Direction)
+		v.rewrittenQuery = buf.String()
 
 	case *Limit:
 		if node == nil {
@@ -831,6 +958,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%v, ", node.Offset)
 		}
 		buf.astPrintf(node, "%v", node.Rowcount)
+		v.rewrittenQuery = buf.String()
 
 	case Values:
 		prefix := "values "
@@ -838,6 +966,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case UpdateExprs:
 		var prefix string
@@ -845,9 +974,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *UpdateExpr:
 		buf.astPrintf(node, "%v = %v", node.Name, node.Expr)
+		v.rewrittenQuery = buf.String()
 
 	case SetExprs:
 		var prefix string
@@ -855,6 +986,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
+		v.rewrittenQuery = buf.String()
 
 	case *SetExpr:
 		if node.Scope != "" {
@@ -871,27 +1003,33 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		default:
 			buf.astPrintf(node, "%v = %v", node.Name, node.Expr)
 		}
+		v.rewrittenQuery = buf.String()
 
 	case OnDup:
 		if node == nil {
 			return nil
 		}
 		buf.astPrintf(node, " on duplicate key update %v", UpdateExprs(node))
+		v.rewrittenQuery = buf.String()
 
 	case ColIdent:
 		for i := NoAt; i < node.at; i++ {
 			buf.WriteByte('@')
 		}
 		formatID(buf, node.val, node.Lowered(), node.at)
+		v.rewrittenQuery = buf.String()
 
 	case TableIdent:
 		formatID(buf, node.v, strings.ToLower(node.v), NoAt)
+		v.rewrittenQuery = buf.String()
 
 	case *IsolationLevel:
 		buf.WriteString("isolation level " + node.Level)
+		v.rewrittenQuery = buf.String()
 
 	case *AccessMode:
 		buf.WriteString(node.Mode)
+		v.rewrittenQuery = buf.String()
 	}
 	return nil
 }
