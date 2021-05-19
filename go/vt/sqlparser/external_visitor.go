@@ -115,16 +115,17 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			fromStr = fromVis.GetRewrittenQuery()
 		}
 		qIdSubtree, _ := fromVis.computeQIDWhereSubTree()
-		if node.Where != nil {
+		augmentedWhere := node.Where
+		if augmentedWhere != nil {
 			newWhereExpr := &AndExpr{
 				Left:  node.Where.Expr,
 				Right: qIdSubtree,
 			}
-			node.Where.Expr = newWhereExpr
+			augmentedWhere = NewWhere(WhereStr, newWhereExpr)
 		} else {
-			node.Where = NewWhere(WhereStr, qIdSubtree)
+			augmentedWhere = NewWhere(WhereStr, qIdSubtree)
 		}
-		node.Where.Accept(v)
+		augmentedWhere.Accept(v)
 		whereStr = v.GetRewrittenQuery()
 		if node.GroupBy != nil {
 			node.GroupBy.Accept(v)
