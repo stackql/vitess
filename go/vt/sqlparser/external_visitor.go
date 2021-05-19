@@ -15,14 +15,14 @@ type DRMAstVisitor struct {
 	iDColumnName        string
 	rewrittenQuery      string
 	gcQueries           []string
-	tablesToRewrite     map[*AliasedTableExpr]TableName
+	tablesCited         map[*AliasedTableExpr]TableName
 	shouldCollectTables bool
 }
 
 func NewDRMAstVisitor(iDColumnName string, shouldCollectTables bool) *DRMAstVisitor {
 	return &DRMAstVisitor{
 		iDColumnName:        iDColumnName,
-		tablesToRewrite:     make(map[*AliasedTableExpr]TableName),
+		tablesCited:         make(map[*AliasedTableExpr]TableName),
 		shouldCollectTables: shouldCollectTables,
 	}
 }
@@ -35,31 +35,28 @@ func (v *DRMAstVisitor) GetGCQueries() []string {
 	return v.gcQueries
 }
 
-func (v *DRMAstVisitor) generateQIDComparison(tn TableName) *ComparisonExpr {
+func (v *DRMAstVisitor) generateQIDComparison(ta TableIdent) *ComparisonExpr {
 	return &ComparisonExpr{
-		Left: &ColName{
-			Name:      NewColIdent(v.iDColumnName),
-			Qualifier: tn,
-		},
+		Left:     &ColName{Qualifier: TableName{Name: ta}, Name: NewColIdent(v.iDColumnName)},
 		Right:    NewValArg([]byte(":" + v.iDColumnName)),
 		Operator: EqualStr,
 	}
 }
 
 func (v *DRMAstVisitor) computeQIDWhereSubTree() (Expr, error) {
-	tblCount := len(v.tablesToRewrite)
+	tblCount := len(v.tablesCited)
 	if tblCount == 0 {
 		return nil, nil
 	}
 	if tblCount == 1 {
-		for _, val := range v.tablesToRewrite {
-			return v.generateQIDComparison(val), nil
+		for k := range v.tablesCited {
+			return v.generateQIDComparison(k.As), nil
 		}
 	}
 	var retVal, curAndExpr *AndExpr
 	i := 0
-	for _, val := range v.tablesToRewrite {
-		comparisonExpr := v.generateQIDComparison(val)
+	for k := range v.tablesCited {
+		comparisonExpr := v.generateQIDComparison(k.As)
 		if i == 0 {
 			curAndExpr = &AndExpr{Left: comparisonExpr}
 			retVal = curAndExpr
@@ -111,7 +108,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		fromVis := NewDRMAstVisitor(v.iDColumnName, true)
 		if node.From != nil {
 			node.From.Accept(fromVis)
-			v.tablesToRewrite = fromVis.tablesToRewrite
+			v.tablesCited = fromVis.tablesCited
 			fromStr = fromVis.GetRewrittenQuery()
 		}
 		qIdSubtree, _ := fromVis.computeQIDWhereSubTree()
@@ -700,7 +697,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			if v.shouldCollectTables {
 				switch te := node.Expr.(type) {
 				case TableName:
-					v.tablesToRewrite[node] = te
+					v.tablesCited[node] = te
 				}
 			}
 			exprStr = v.GetRewrittenQuery()
