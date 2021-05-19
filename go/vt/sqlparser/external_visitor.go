@@ -12,16 +12,69 @@ type SQLAstVisitor interface {
 }
 
 type DRMAstVisitor struct {
-	rewrittenQuery string
-	gcQuery        string
+	iDColumnName        string
+	rewrittenQuery      string
+	gcQueries           []string
+	tablesToRewrite     map[*AliasedTableExpr]TableName
+	shouldCollectTables bool
+}
+
+func NewDRMAstVisitor(iDColumnName string, shouldCollectTables bool) *DRMAstVisitor {
+	return &DRMAstVisitor{
+		iDColumnName:        iDColumnName,
+		tablesToRewrite:     make(map[*AliasedTableExpr]TableName),
+		shouldCollectTables: shouldCollectTables,
+	}
 }
 
 func (v *DRMAstVisitor) GetRewrittenQuery() string {
 	return v.rewrittenQuery
 }
 
-func (v *DRMAstVisitor) GetGCQuery() string {
-	return v.gcQuery
+func (v *DRMAstVisitor) GetGCQueries() []string {
+	return v.gcQueries
+}
+
+func (v *DRMAstVisitor) generateQIDComparison(tn TableName) *ComparisonExpr {
+	return &ComparisonExpr{
+		Left: &ColName{
+			Name:      NewColIdent(v.iDColumnName),
+			Qualifier: tn,
+		},
+		Right:    NewValArg([]byte(":" + v.iDColumnName)),
+		Operator: EqualStr,
+	}
+}
+
+func (v *DRMAstVisitor) computeQIDWhereSubTree() (Expr, error) {
+	tblCount := len(v.tablesToRewrite)
+	if tblCount == 0 {
+		return nil, nil
+	}
+	if tblCount == 1 {
+		for _, val := range v.tablesToRewrite {
+			return v.generateQIDComparison(val), nil
+		}
+	}
+	var retVal, curAndExpr *AndExpr
+	i := 0
+	for _, val := range v.tablesToRewrite {
+		comparisonExpr := v.generateQIDComparison(val)
+		if i == 0 {
+			curAndExpr = &AndExpr{Left: comparisonExpr}
+			retVal = curAndExpr
+			i++
+			continue
+		}
+		if i == tblCount {
+			curAndExpr.Right = comparisonExpr
+			break
+		}
+		newAndExpr := &AndExpr{Left: comparisonExpr}
+		curAndExpr.Right = newAndExpr
+		curAndExpr = newAndExpr
+	}
+	return retVal, nil
 }
 
 func (v *DRMAstVisitor) Visit(node SQLNode) error {
@@ -55,14 +108,24 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			node.SelectExprs.Accept(v)
 			selectExprStr = v.GetRewrittenQuery()
 		}
+		fromVis := NewDRMAstVisitor(v.iDColumnName, true)
 		if node.From != nil {
-			node.From.Accept(v)
-			fromStr = v.GetRewrittenQuery()
+			node.From.Accept(fromVis)
+			v.tablesToRewrite = fromVis.tablesToRewrite
+			fromStr = fromVis.GetRewrittenQuery()
 		}
+		qIdSubtree, _ := fromVis.computeQIDWhereSubTree()
 		if node.Where != nil {
-			node.Where.Accept(v)
-			whereStr = v.GetRewrittenQuery()
+			newWhereExpr := &AndExpr{
+				Left:  node.Where.Expr,
+				Right: qIdSubtree,
+			}
+			node.Where.Expr = newWhereExpr
+		} else {
+			node.Where = NewWhere(WhereStr, qIdSubtree)
 		}
+		node.Where.Accept(v)
+		whereStr = v.GetRewrittenQuery()
 		if node.GroupBy != nil {
 			node.GroupBy.Accept(v)
 			groupByStr = v.GetRewrittenQuery()
@@ -85,32 +148,33 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 			groupByStr, havingStr, orderByStr,
 			limitStr, node.Lock)
 		v.rewrittenQuery = rq
-		v.gcQuery = ""
 		return nil
 
 	case *ParenSelect:
-		buf.astPrintf(node, "(%v)", node.Select)
-		v.rewrittenQuery = buf.String()
+		node.Accept(v)
+		selStr := v.GetRewrittenQuery()
+		rq := fmt.Sprintf("(%v)", selStr)
+		v.rewrittenQuery = rq
 
 	case *Auth:
 		var infraql_opt string
 		if node.SessionAuth {
 			infraql_opt = "infraql "
 		}
-		buf.astPrintf(node, "%sAUTH %v %s %v", infraql_opt, node.Provider, node.Type, node.KeyFilePath)
-		v.rewrittenQuery = buf.String()
+		rq := fmt.Sprintf("%sAUTH %v %s %v", infraql_opt, node.Provider, node.Type, node.KeyFilePath)
+		v.rewrittenQuery = rq
 
 	case *AuthRevoke:
 		var infraql_opt string
 		if node.SessionAuth {
 			infraql_opt = "infraql "
 		}
-		buf.astPrintf(node, "%sauth revoke %v", infraql_opt, node.Provider)
-		v.rewrittenQuery = buf.String()
+		rq := fmt.Sprintf("%sauth revoke %v", infraql_opt, node.Provider)
+		v.rewrittenQuery = rq
 
 	case *Sleep:
-		buf.astPrintf(node, "sleep %v", node.Duration)
-		v.rewrittenQuery = buf.String()
+		rq := fmt.Sprintf("sleep %v", node.Duration)
+		v.rewrittenQuery = rq
 
 	case *Union:
 		buf.astPrintf(node, "%v", node.FirstStatement)
@@ -620,27 +684,48 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		v.rewrittenQuery = buf.String()
 
 	case TableExprs:
-		var prefix string
+		var exprs []string
 		for _, n := range node {
-			buf.astPrintf(node, "%s%v", prefix, n)
-			prefix = ", "
+			n.Accept(v)
+			s := v.GetRewrittenQuery()
+			exprs = append(exprs, s)
 		}
-		v.rewrittenQuery = buf.String()
+		v.rewrittenQuery = strings.Join(exprs, ", ")
 
 	case *AliasedTableExpr:
-		buf.astPrintf(node, "%v%v", node.Expr, node.Partitions)
+		var exprStr, partitionStr string
+		if node.Expr != nil {
+			node.Expr.Accept(v)
+			if v.shouldCollectTables {
+				switch te := node.Expr.(type) {
+				case TableName:
+					v.tablesToRewrite[node] = te
+				}
+			}
+			exprStr = v.GetRewrittenQuery()
+		}
+		if node.Partitions != nil {
+			node.Partitions.Accept(v)
+			partitionStr = v.GetRewrittenQuery()
+		}
+		q := fmt.Sprintf("%s%s", exprStr, partitionStr)
 		if !node.As.IsEmpty() {
-			buf.astPrintf(node, " as %v", node.As)
+			node.As.Accept(v)
+			asStr := v.GetRewrittenQuery()
+			q = fmt.Sprintf("%s as %v", q, asStr)
 		}
 		if node.Hints != nil {
+			node.Hints.Accept(v)
 			// Hint node provides the space padding.
-			buf.astPrintf(node, "%v", node.Hints)
+			hintStr := v.GetRewrittenQuery()
+			q = fmt.Sprintf("%s%v", q, hintStr)
 		}
-		v.rewrittenQuery = buf.String()
+		v.rewrittenQuery = q
 
 	case TableNames:
 		var prefix string
 		for _, n := range node {
+			n.Accept(v)
 			buf.astPrintf(node, "%s%v", prefix, n)
 			prefix = ", "
 		}
@@ -1032,8 +1117,4 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		v.rewrittenQuery = buf.String()
 	}
 	return nil
-}
-
-func NewDRMAstVisitor() *DRMAstVisitor {
-	return &DRMAstVisitor{}
 }
