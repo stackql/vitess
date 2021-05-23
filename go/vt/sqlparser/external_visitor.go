@@ -375,46 +375,46 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 
 		opts := make([]string, 0, 16)
 		if ct.Unsigned {
-			opts = append(opts, keywordStrings[UNSIGNED])
+			opts = append(opts, KeywordStrings[UNSIGNED])
 		}
 		if ct.Zerofill {
-			opts = append(opts, keywordStrings[ZEROFILL])
+			opts = append(opts, KeywordStrings[ZEROFILL])
 		}
 		if ct.Charset != "" {
-			opts = append(opts, keywordStrings[CHARACTER], keywordStrings[SET], ct.Charset)
+			opts = append(opts, KeywordStrings[CHARACTER], KeywordStrings[SET], ct.Charset)
 		}
 		if ct.Collate != "" {
-			opts = append(opts, keywordStrings[COLLATE], ct.Collate)
+			opts = append(opts, KeywordStrings[COLLATE], ct.Collate)
 		}
 		if ct.NotNull {
-			opts = append(opts, keywordStrings[NOT], keywordStrings[NULL])
+			opts = append(opts, KeywordStrings[NOT], KeywordStrings[NULL])
 		}
 		if ct.Default != nil {
-			opts = append(opts, keywordStrings[DEFAULT], String(ct.Default))
+			opts = append(opts, KeywordStrings[DEFAULT], String(ct.Default))
 		}
 		if ct.OnUpdate != nil {
-			opts = append(opts, keywordStrings[ON], keywordStrings[UPDATE], String(ct.OnUpdate))
+			opts = append(opts, KeywordStrings[ON], KeywordStrings[UPDATE], String(ct.OnUpdate))
 		}
 		if ct.Autoincrement {
-			opts = append(opts, keywordStrings[AUTO_INCREMENT])
+			opts = append(opts, KeywordStrings[AUTO_INCREMENT])
 		}
 		if ct.Comment != nil {
-			opts = append(opts, keywordStrings[COMMENT_KEYWORD], String(ct.Comment))
+			opts = append(opts, KeywordStrings[COMMENT_KEYWORD], String(ct.Comment))
 		}
-		if ct.KeyOpt == colKeyPrimary {
-			opts = append(opts, keywordStrings[PRIMARY], keywordStrings[KEY])
+		if ct.KeyOpt == ColKeyPrimary {
+			opts = append(opts, KeywordStrings[PRIMARY], KeywordStrings[KEY])
 		}
-		if ct.KeyOpt == colKeyUnique {
-			opts = append(opts, keywordStrings[UNIQUE])
+		if ct.KeyOpt == ColKeyUnique {
+			opts = append(opts, KeywordStrings[UNIQUE])
 		}
-		if ct.KeyOpt == colKeyUniqueKey {
-			opts = append(opts, keywordStrings[UNIQUE], keywordStrings[KEY])
+		if ct.KeyOpt == ColKeyUniqueKey {
+			opts = append(opts, KeywordStrings[UNIQUE], KeywordStrings[KEY])
 		}
-		if ct.KeyOpt == colKeySpatialKey {
-			opts = append(opts, keywordStrings[SPATIAL], keywordStrings[KEY])
+		if ct.KeyOpt == ColKeySpatialKey {
+			opts = append(opts, KeywordStrings[SPATIAL], KeywordStrings[KEY])
 		}
-		if ct.KeyOpt == colKey {
-			opts = append(opts, keywordStrings[KEY])
+		if ct.KeyOpt == ColKey {
+			opts = append(opts, KeywordStrings[KEY])
 		}
 
 		if len(opts) != 0 {
@@ -917,8 +917,8 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		// if they match a reserved word, only if they contain illegal characters
 		funcName := node.Name.String()
 
-		if containEscapableChars(funcName, NoAt) {
-			writeEscapedString(buf, funcName)
+		if ContainEscapableChars(funcName, NoAt) {
+			WriteEscapedString(buf, funcName)
 		} else {
 			buf.WriteString(funcName)
 		}
@@ -992,7 +992,7 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		buf.astPrintf(node, "default")
 		if node.ColName != "" {
 			buf.WriteString("(")
-			formatID(buf, node.ColName, strings.ToLower(node.ColName), NoAt)
+			FormatID(buf, node.ColName, strings.ToLower(node.ColName), NoAt)
 			buf.WriteString(")")
 		}
 		v.rewrittenQuery = buf.String()
@@ -1099,11 +1099,11 @@ func (v *DRMAstVisitor) Visit(node SQLNode) error {
 		for i := NoAt; i < node.at; i++ {
 			buf.WriteByte('@')
 		}
-		formatID(buf, node.val, node.Lowered(), node.at)
+		FormatID(buf, node.val, node.Lowered(), node.at)
 		v.rewrittenQuery = buf.String()
 
 	case TableIdent:
-		formatID(buf, node.v, strings.ToLower(node.v), NoAt)
+		FormatID(buf, node.v, strings.ToLower(node.v), NoAt)
 		v.rewrittenQuery = buf.String()
 
 	case *IsolationLevel:
