@@ -609,6 +609,10 @@ func (node ColIdent) GetRawVal() string {
 	return node.val
 }
 
+func (node ColIdent) GetAtCount() AtCount {
+	return node.at
+}
+
 // Equal performs a case-insensitive compare.
 func (node ColIdent) Equal(in ColIdent) bool {
 	return node.Lowered() == in.Lowered()
