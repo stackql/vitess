@@ -1021,10 +1021,6 @@ type TableIdent struct {
 	v string
 }
 
-func (node TableIdent) GetRawVal() string {
-	return node.v
-}
-
 // Here follow all the Format implementations for AST nodes
 
 // Format formats the node.

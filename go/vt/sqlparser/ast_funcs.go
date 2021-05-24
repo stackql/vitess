@@ -679,6 +679,10 @@ func (node *TableIdent) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (node TableIdent) GetRawVal() string {
+	return node.v
+}
+
 func ContainEscapableChars(s string, at AtCount) bool {
 	isDbSystemVariable := at != NoAt
 
