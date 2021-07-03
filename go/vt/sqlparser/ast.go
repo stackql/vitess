@@ -1801,7 +1801,7 @@ func (node *SubstrExpr) Format(buf *TrackedBuffer) {
 
 // Format formats the node.
 func (node *ConvertExpr) Format(buf *TrackedBuffer) {
-	buf.astPrintf(node, "convert(%v, %v)", node.Expr, node.Type)
+	buf.astPrintf(node, "cast(%v AS %v)", node.Expr, node.Type)
 }
 
 // Format formats the node.
