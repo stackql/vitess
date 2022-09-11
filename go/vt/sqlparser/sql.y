@@ -1840,6 +1840,11 @@ show_statement:
     showTablesOpt := &ShowTablesOpt{Filter: $7}
     $$ = &Show{Extended: string($2), Comments: Comments($4), Type: string($3), OnTable: $5, ShowTablesOpt: showTablesOpt, Columns: $6}
   }
+| SHOW TRANSACTION ISOLATION LEVEL
+
+  {
+    $$ = &Show{Type: "TRANSACTION_ISOLATION_LEVEL"}
+  }
 
 tables_or_processlist:
   TABLES
