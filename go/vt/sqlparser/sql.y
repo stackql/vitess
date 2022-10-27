@@ -230,6 +230,9 @@ func skipToEnd(yylex interface{}) {
 // Exec tokens
 %token <bytes> EXEC
 
+// Purge tokens
+%token <bytes> PURGE
+
 // infraql
 %token <bytes> STACKQL
 
@@ -241,7 +244,7 @@ func skipToEnd(yylex interface{}) {
 %type <ddl> create_table_prefix rename_list
 %type <statement> analyze_statement show_statement use_statement other_statement
 %type <statement> begin_statement commit_statement rollback_statement savepoint_statement release_statement
-%type <statement> auth_statement exec_stmt sleep_stmt registry_stmt
+%type <statement> auth_statement exec_stmt sleep_stmt registry_stmt purge_stmt
 %type <boolVal> infraql_opt
 %type <bytes2> comment_opt comment_list
 %type <str> union_op insert_or_replace explain_format_opt wild_opt
@@ -396,6 +399,7 @@ command:
 | registry_stmt
 | exec_stmt
 | sleep_stmt
+| purge_stmt
 | /*empty*/
 {
   setParseTree(yylex, nil)
@@ -3668,6 +3672,16 @@ exec_stmt:
     $$ = NewExec($2, $3, $4, $5)
   }
 
+purge_stmt:
+   PURGE comment_opt
+  {
+    $$ = NewPurge($2, TableName{}, true)
+  }
+| PURGE comment_opt table_name
+  {
+    $$ = NewPurge($2, $3, false)
+  }
+
 
 /*
   These are not all necessarily reserved in MySQL, but some are.
@@ -3919,6 +3933,7 @@ non_reserved_keyword:
 | PRIMARY
 | PROCEDURE
 | PROCESSLIST
+| PURGE
 | QUERY
 | RANDOM
 | READ

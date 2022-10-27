@@ -527,6 +527,14 @@ func (r *replacePartitionsItems) inc() {
 	*r++
 }
 
+func replacePurgeComments(newNode, parent SQLNode) {
+	parent.(*Purge).Comments = newNode.(Comments)
+}
+
+func replacePurgeTarget(newNode, parent SQLNode) {
+	parent.(*Purge).Target = newNode.(TableName)
+}
+
 func replaceRangeCondFrom(newNode, parent SQLNode) {
 	parent.(*RangeCond).From = newNode.(Expr)
 }
@@ -1237,6 +1245,10 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 			a.apply(node, item, replacerRef.replace)
 			replacerRef.inc()
 		}
+
+	case *Purge:
+		a.apply(node, n.Comments, replacePurgeComments)
+		a.apply(node, n.Target, replacePurgeTarget)
 
 	case *RangeCond:
 		a.apply(node, n.From, replaceRangeCondFrom)

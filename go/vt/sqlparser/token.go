@@ -307,6 +307,7 @@ var keywords = map[string]int{
 	"processlist":         PROCESSLIST,
 	"procedure":           PROCEDURE,
 	"pull":                PULL,
+	"purge":               PURGE,
 	"query":               QUERY,
 	"range":               UNUSED,
 	"read":                READ,

@@ -519,6 +519,15 @@ func NewExec(comments Comments, methodName TableName, execVarDefs []ExecVarDef, 
 	}
 }
 
+// NewExec makes a new Exec.
+func NewPurge(comments Comments, target TableName, isGlobal bool) *Purge {
+	return &Purge{
+		Comments: comments,
+		Target:   target,
+		IsGlobal: isGlobal,
+	}
+}
+
 // NewExecVarDef makes a new ExecVarDef.
 func NewExecVarDef(colIdent ColIdent, val Expr) ExecVarDef {
 	return ExecVarDef{
