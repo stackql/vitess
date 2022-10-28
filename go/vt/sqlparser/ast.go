@@ -89,6 +89,13 @@ type (
 		Target   TableName
 	}
 
+	// Purge represents a PURGE statement
+	NativeQuery struct {
+		Await       bool
+		Comments    Comments
+		QueryString string
+	}
+
 	Sleep struct {
 		Duration *SQLVal
 	}
@@ -342,6 +349,7 @@ func (*Registry) iStatement()          {}
 func (*AuthRevoke) iStatement()        {}
 func (*Exec) iStatement()              {}
 func (*Purge) iStatement()             {}
+func (*NativeQuery) iStatement()       {}
 func (*DescribeTable) iStatement()     {}
 func (*OtherAdmin) iStatement()        {}
 func (*Select) iSelectStatement()      {}
@@ -973,6 +981,10 @@ func (node *Exec) Format(buf *TrackedBuffer) {
 
 func (node *Purge) Format(buf *TrackedBuffer) {
 	buf.astPrintf(node, "purge %v %v", node.Comments, node.Target)
+}
+
+func (node *NativeQuery) Format(buf *TrackedBuffer) {
+	buf.astPrintf(node, "purge %v '%v'", node.Comments, node.QueryString)
 }
 
 func (node *ExecSubquery) Format(buf *TrackedBuffer) {

@@ -519,12 +519,20 @@ func NewExec(comments Comments, methodName TableName, execVarDefs []ExecVarDef, 
 	}
 }
 
-// NewExec makes a new Exec.
+// NewPurge makes a new Purge.
 func NewPurge(comments Comments, target TableName, isGlobal bool) *Purge {
 	return &Purge{
 		Comments: comments,
 		Target:   target,
 		IsGlobal: isGlobal,
+	}
+}
+
+// NewNativeQuery makes a new NativeQuery.
+func NewNativeQuery(comments Comments, queryString string) *NativeQuery {
+	return &NativeQuery{
+		Comments:    comments,
+		QueryString: queryString,
 	}
 }
 

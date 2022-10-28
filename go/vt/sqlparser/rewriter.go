@@ -442,6 +442,10 @@ func replaceMatchExprExpr(newNode, parent SQLNode) {
 	parent.(*MatchExpr).Expr = newNode.(Expr)
 }
 
+func replaceNativeQueryComments(newNode, parent SQLNode) {
+	parent.(*NativeQuery).Comments = newNode.(Comments)
+}
+
 func replaceNextvalExpr(newNode, parent SQLNode) {
 	tmp := parent.(Nextval)
 	tmp.Expr = newNode.(Expr)
@@ -1180,6 +1184,9 @@ func (a *application) apply(parent, node SQLNode, replacer replacerFunc) {
 	case *MatchExpr:
 		a.apply(node, n.Columns, replaceMatchExprColumns)
 		a.apply(node, n.Expr, replaceMatchExprExpr)
+
+	case *NativeQuery:
+		a.apply(node, n.Comments, replaceNativeQueryComments)
 
 	case Nextval:
 		a.apply(node, n.Expr, replaceNextvalExpr)

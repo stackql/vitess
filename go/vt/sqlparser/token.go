@@ -277,6 +277,7 @@ var keywords = map[string]int{
 	"multipoint":          MULTIPOINT,
 	"multipolygon":        MULTIPOLYGON,
 	"names":               NAMES,
+	"nativequery":         NATIVEQUERY,
 	"natural":             NATURAL,
 	"nchar":               NCHAR,
 	"next":                NEXT,
