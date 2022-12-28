@@ -695,11 +695,11 @@ create_statement:
     // Change this to an alter statement
     $$ = &DDL{Action: AlterStr, Table: $7}
   }
-| CREATE VIEW table_name ddl_skip_to_end
+| CREATE VIEW table_name select_statement
   {
     $$ = &DDL{Action: CreateStr, Table: $3.ToViewName()}
   }
-| CREATE OR REPLACE VIEW table_name ddl_skip_to_end
+| CREATE OR REPLACE VIEW table_name select_statement
   {
     $$ = &DDL{Action: CreateStr, Table: $5.ToViewName()}
   }
