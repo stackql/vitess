@@ -4305,13 +4305,13 @@ yydefault:
 		yyDollar = yyS[yypt-4 : yypt+1]
 //line sql.y:699
 		{
-			yyVAL.statement = &DDL{Action: CreateStr, Table: yyDollar[3].tableName.ToViewName()}
+			yyVAL.statement = &DDL{Action: CreateStr, Table: yyDollar[3].tableName.ToViewName(), SelectStatement: yyDollar[4].selStmt}
 		}
 	case 86:
 		yyDollar = yyS[yypt-6 : yypt+1]
 //line sql.y:703
 		{
-			yyVAL.statement = &DDL{Action: CreateStr, Table: yyDollar[5].tableName.ToViewName()}
+			yyVAL.statement = &DDL{Action: CreateStr, Table: yyDollar[5].tableName.ToViewName(), SelectStatement: yyDollar[6].selStmt}
 		}
 	case 87:
 		yyDollar = yyS[yypt-5 : yypt+1]

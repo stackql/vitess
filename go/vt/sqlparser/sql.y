@@ -697,11 +697,11 @@ create_statement:
   }
 | CREATE VIEW table_name select_statement
   {
-    $$ = &DDL{Action: CreateStr, Table: $3.ToViewName()}
+    $$ = &DDL{Action: CreateStr, Table: $3.ToViewName(), SelectStatement: $4 }
   }
 | CREATE OR REPLACE VIEW table_name select_statement
   {
-    $$ = &DDL{Action: CreateStr, Table: $5.ToViewName()}
+    $$ = &DDL{Action: CreateStr, Table: $5.ToViewName(), SelectStatement: $6 }
   }
 | CREATE DATABASE not_exists_opt id_or_var ddl_skip_to_end
   {
