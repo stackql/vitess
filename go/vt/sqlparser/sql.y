@@ -121,6 +121,7 @@ func skipToEnd(yylex interface{}) {
   execVarDef    ExecVarDef
   execVarDefOpt *ExecVarDef
   execVarDefs   []ExecVarDef
+  listArgsConcat []ListArg
 }
 
 %token LEX_ERROR
@@ -355,6 +356,7 @@ func skipToEnd(yylex interface{}) {
 %type <execVarDef> exec_var exec_payload
 %type <execVarDefOpt> opt_exec_payload
 %type <execVarDefs> exec_var_list
+%type <listArgsConcat> list_arg_concatamer
 
 %start any_command
 
@@ -2583,6 +2585,10 @@ expression:
   {
     $$ = &IsExpr{Operator: $3, Expr: $1}
   }
+| value_expression list_arg_concatamer
+  {
+    $$ = &UnaryCastConcatamerExpr{ Expr: $1, CastConcatamer: ListArgConcatamer($2) }
+  }
 | value_expression
   {
     $$ = $1
@@ -2731,6 +2737,15 @@ col_tuple:
 | LIST_ARG
   {
     $$ = ListArg($1)
+  }
+
+list_arg_concatamer:
+LIST_ARG {
+    $$ = []ListArg{ListArg($1)}
+  }
+|  list_arg_concatamer LIST_ARG
+  {
+    $$ = append($1, ListArg($2))
   }
 
 subquery:
