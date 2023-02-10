@@ -54,7 +54,6 @@ func (node JoinCondition) Accept(vis SQLAstVisitor) error            { return vi
 func (node *JoinTableExpr) Accept(vis SQLAstVisitor) error           { return vis.Visit(node) }
 func (node *Limit) Accept(vis SQLAstVisitor) error                   { return vis.Visit(node) }
 func (node ListArg) Accept(vis SQLAstVisitor) error                  { return vis.Visit(node) }
-func (node ListArgConcatamer) Accept(vis SQLAstVisitor) error        { return vis.Visit(node) }
 func (node *MatchExpr) Accept(vis SQLAstVisitor) error               { return vis.Visit(node) }
 func (node Nextval) Accept(vis SQLAstVisitor) error                  { return vis.Visit(node) }
 func (node *NotExpr) Accept(vis SQLAstVisitor) error                 { return vis.Visit(node) }
