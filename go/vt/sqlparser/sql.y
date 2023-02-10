@@ -2255,6 +2255,12 @@ select_expression:
   {
     $$ = &StarExpr{}
   }
+| expression list_arg_concatamer
+  // Ignoring casts for now
+  {
+    concatamer := ListArgConcatamer($2)
+    $$ = &AliasedExpr{Expr: $1, As: concatamer.String() }
+  }
 | expression as_ci_opt
   {
     $$ = &AliasedExpr{Expr: $1, As: $2}
