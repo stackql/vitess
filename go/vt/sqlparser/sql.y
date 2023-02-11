@@ -2256,7 +2256,6 @@ select_expression:
     $$ = &StarExpr{}
   }
 | expression list_arg_concatamer
-  // Ignoring casts for now
   {
     concatamer := ListArgConcatamer($2)
     $$ = &AliasedExpr{Expr: $1, As: NewColIdent(concatamer.String()) }
@@ -2591,7 +2590,7 @@ expression:
   {
     $$ = &IsExpr{Operator: $3, Expr: $1}
   }
-| value_expression list_arg_concatamer
+| expression list_arg_concatamer
   {
     $$ = &UnaryCastConcatamerExpr{ Expr: $1, CastConcatamer: ListArgConcatamer($2) }
   }
