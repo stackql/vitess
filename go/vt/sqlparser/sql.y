@@ -2259,7 +2259,7 @@ select_expression:
   // Ignoring casts for now
   {
     concatamer := ListArgConcatamer($2)
-    $$ = &AliasedExpr{Expr: $1, As: concatamer.String() }
+    $$ = &AliasedExpr{Expr: $1, As: NewColIdent(concatamer.String()) }
   }
 | expression as_ci_opt
   {

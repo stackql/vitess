@@ -6320,7 +6320,7 @@ yydefault:
 //line sql.y:2260
 		{
 			concatamer := ListArgConcatamer(yyDollar[2].listArgsConcat)
-			yyVAL.selectExpr = &AliasedExpr{Expr: yyDollar[1].expr, As: concatamer.String()}
+			yyVAL.selectExpr = &AliasedExpr{Expr: yyDollar[1].expr, As: NewColIdent(concatamer.String())}
 		}
 	case 416:
 		yyDollar = yyS[yypt-2 : yypt+1]
