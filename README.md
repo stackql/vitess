@@ -6,6 +6,10 @@
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1724/badge)](https://bestpractices.coreinfrastructure.org/projects/1724)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=vitessio&metric=coverage)](https://sonarcloud.io/dashboard?id=vitessio)
 
+# Migration to new repository
+
+This repository is dead.  The codebase has been migrated to [the new stackql-parser repository](https://github.com/stackql/stackql-parser).  Please use the new codebase.  The current repository will be removed at some time in the future.
+
 # Vitess 
 
 Vitess is a database clustering system for horizontal scaling of MySQL
